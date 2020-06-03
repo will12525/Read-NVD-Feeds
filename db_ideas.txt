@@ -1,0 +1,39 @@
+main_table
+string, float,         float,         string/time,    string/time,        array
+CVE_ID, CVSS Score V2, CVSS Score V3, Published Date, Last Modified Date, Description
+CREATE TABLE CVEs(cve_id VARCHAR(20) PRIMARY KEY, score_v2 NUMERIC (3,1), score_v3 NUMERIC (3,1), pub_date TIMESTAMPTZ NOT NULL, mod_date TIMESTAMPTZ NOT NULL, description TEXT []);
+CREATE TABLE CVEs(
+    cve_id VARCHAR(20) PRIMARY KEY,
+    score_v2 NUMERIC (3,1),
+    score_v3 NUMERIC (3,1),
+    pub_date TIMESTAMPTZ NOT NULL,
+    mod_date TIMESTAMPTZ NOT NULL,
+    description TEXT []
+);
+INSERT INTO CVEs (cve_id, score_v2, score_v3, pub_date, mod_date, description) VALUES (%s, %s, %s, %s, %s, %s)
+
+product_table
+string, string,       string,          string,           float,       string,                string
+CVE_ID, Product Name, Product Version, Product Version2, CPE version, version Start Include, version End Include
+CREATE TABLE products(id SERIAL PRIMARY KEY, cve_id VARCHAR(20) NOT NULL, prod_name VARCHAR NOT NULL, version1 VARCHAR, version2 VARCHAR, cpe_version NUMERIC (3,1) NOT NULL, version_start VARCHAR, version_end VARCHAR);
+CREATE TABLE products(
+    id SERIAL PRIMARY KEY,
+    cve_id VARCHAR(20) NOT NULL,
+    prod_name VARCHAR NOT NULL,
+    version1 VARCHAR,
+    version2 VARCHAR,
+    cpe_version NUMERIC (3,1) NOT NULL,
+    version_start VARCHAR,
+    version_end VARCHAR
+);
+INSERT INTO products (cve_id, prod_name, version1, version2, cpe_version, version_start, version_end) VALUES (%s, %s, %s, %s, %s, %s, %s)
+
+modified_table
+number,    string\time
+file_year, date_modified
+CREATE TABLE modified_files(year NUMERIC(4,0) PRIMARY KEY NOT NULL, modified TIMESTAMPTZ NOT NULL);
+CREATE TABLE modified_files(
+    year NUMERIC(4,0) PRIMARY KEY NOT NULL,
+    modified TIMESTAMPTZ NOT NULL
+);
+INSERT INTO modified_files(year, modified) VALUES (%s, %s)
