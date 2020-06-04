@@ -1,11 +1,27 @@
+"""Usage: main.py [-hv] <DBName> <DBUser> <host> <password>
+
+Arguments:
+    DBName = The name of the database
+    DBUser = The name of the user to connect to the database
+    host = Access point for the databse
+    password = password for the user accessing the database
+
+Options:
+  -h --help     Show this screen.
+  -v --verbose  Show extra information.
+
+"""
 import requests
 import psycopg2
 import gzip
 import json
-import pprint
 import re
+from docopt import docopt
+
+verbose = False
 
 
+# This function downloads specific CVE feed files from th web and saves the file locally
 def download_gz_file(file_name):
     url = 'https://nvd.nist.gov/feeds/json/cve/1.1/'
     request_url = '{0}{1}'.format(url, file_name)
@@ -15,6 +31,7 @@ def download_gz_file(file_name):
             fd.write(chunk)
 
 
+# This function checks the meta data file and returns the last modified date of the CVE file
 def request_meta_data(file_name):
     url = 'https://nvd.nist.gov/feeds/json/cve/1.1/'
     request_url = '{0}{1}'.format(url, file_name)
@@ -24,6 +41,7 @@ def request_meta_data(file_name):
     return False
 
 
+# This function sorts through a CVEs affected products and returns a list of them
 def handle_products(node, product_list, cve_id):
     if node.get("operator") == "AND":
         for inner_nodes in node.get("children"):
@@ -49,6 +67,7 @@ def handle_products(node, product_list, cve_id):
                 print('{0}{1}'.format("No product exists for: ", cve_id))
 
 
+# This function gets the cvss base score for V2 and V3
 def get_cvssv_score(version, impact):
     base = "{0}{1}".format("baseMetric", version)
     cvss = "{0}{1}".format("cvss", version)
@@ -56,11 +75,12 @@ def get_cvssv_score(version, impact):
         return impact.get(base).get(cvss).get("baseScore")
     except AttributeError:
         if verbose:
-            print("cvssv3 score doesn't exist")
+            print("{0}{1}".format(cvss, " score doesn't exist"))
         return None
 
 
-def add_file_to_db(filename, modify):
+# This function sorts through a given files JSON and inserts or modifies the necessary information in the database
+def add_file_to_db(filename, modify, cur, conn):
     # remove products related to this ID, update
     # DELETE FROM products WHERE cve_id = %s
     with gzip.open(filename, 'rt') as zipfile:
@@ -85,7 +105,7 @@ def add_file_to_db(filename, modify):
                 if record is None:
                     # The current record is older than the new record.
                     sql_query = "delete from products WHERE cve_id = %s"
-                    cur.execute(sql_query, (cve_id, ))
+                    cur.execute(sql_query, (cve_id,))
                     sql_query = "delete from cve_id WHERE cve_id = %s"
                     cur.execute(sql_query, (cve_id,))
                 else:
@@ -107,7 +127,6 @@ def add_file_to_db(filename, modify):
             except TypeError:
                 if verbose:
                     print("No nodes found")
-
 
             sql = """ INSERT INTO CVEs 
             (cve_id, score_v2, score_v3, pub_date, mod_date, description) 
@@ -131,7 +150,7 @@ def add_file_to_db(filename, modify):
 
 # Checks meta data dates of all data-feed files and compares the date to a stored value in the db.
 # If the year doesn't exist then this downloads the new file and adds its data to the database.
-def check_all_files():
+def check_all_files(cur, conn):
     r = requests.get("https://nvd.nist.gov/vuln/data-feeds#JSON_FEED")
 
     for filename in re.findall(r'nvdcve-1.1-[0-9]*\.meta', r.text):
@@ -154,7 +173,7 @@ def check_all_files():
                     conn.commit()
                 except Exception as err:
                     print(err)
-                add_file_to_db(download_file, False)
+                add_file_to_db(download_file, False, cur, conn)
 
             else:
                 sql_query = "select * from modified_files where year = %s AND modified < %s"
@@ -167,17 +186,27 @@ def check_all_files():
                     sql_update_query = """Update modified_files set modified = %s where year = %s"""
                     cur.execute(sql_update_query, (file_last_modified, year))
                     conn.commit()
-                    add_file_to_db(download_file, True)
+                    add_file_to_db(download_file, True, cur, conn)
     print("Done file check")
 
 
-if __name__ == '__main__':
-    verbose = False
+# Main function collects args and handles connecting to and closing the database.
+def main():
+    global verbose
+    args = docopt(__doc__, version='CVE Getter')
+    dbname = args["<DBName>"]
+    dbuser = args["<DBUser>"]
+    host = args["<host>"]
+    pword = args["<password>"]
+    verbose = args['--verbose']
+
     conn = None
     cur = None
 
     try:
-        conn = psycopg2.connect("dbname='maindb' user='main' host='localhost' password='myPass'")
+        conn = psycopg2.connect(
+            "{0}{1}{2}{3}{4}{5}{6}{7}{8}".format("dbname='", dbname, "' user='", dbuser, "' host='", host,
+                                                 "' password='", pword, "'"))
         cur = conn.cursor()
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
@@ -185,9 +214,13 @@ if __name__ == '__main__':
             print("Unable to connect to database")
         exit(1)
 
-    check_all_files()
+    check_all_files(cur, conn)
 
     if conn is not None:
         cur.close()
         conn.close()
     print("Done")
+
+
+if __name__ == '__main__':
+    main()

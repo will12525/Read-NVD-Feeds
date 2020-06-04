@@ -1,1 +1,0 @@
-This is a test program for reading and querying NVD Data feeds.
