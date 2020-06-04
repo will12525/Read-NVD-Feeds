@@ -1,0 +1,32 @@
+CREATE SCHEMA IF NOT EXISTS main;
+
+CREATE  TABLE main.modified_files ( 
+	"year"               numeric(4,0)  NOT NULL ,
+	modified             timestamptz  NOT NULL ,
+	CONSTRAINT pk_modified_files_year PRIMARY KEY ( "year" )
+ );
+
+CREATE  TABLE main.products ( 
+	id                   serial  NOT NULL ,
+	cve_id               varchar(20)  NOT NULL ,
+	prod_name            varchar  NOT NULL ,
+	version1             varchar   ,
+	version2             varchar   ,
+	cpe_version          numeric(3,1)  NOT NULL ,
+	version_start        varchar   ,
+	version_end          varchar   ,
+	CONSTRAINT pk_products_id PRIMARY KEY ( id ),
+	CONSTRAINT unq_products_cve_id UNIQUE ( cve_id ) 
+ );
+
+CREATE  TABLE main.CVEs ( 
+	cve_id               varchar(20)  NOT NULL ,
+	score_v2             numeric(3,1)   ,
+	score_v3             numeric(3,1)   ,
+	pud_date             timestamptz  NOT NULL ,
+	mod_date             timestamptz  NOT NULL ,
+	description          text[]   ,
+	CONSTRAINT pk_CVEs_cve_id PRIMARY KEY ( cve_id )
+ );
+
+ALTER TABLE main.CVEs ADD CONSTRAINT fk_CVEs_products FOREIGN KEY ( cve_id ) REFERENCES main.products( cve_id );
